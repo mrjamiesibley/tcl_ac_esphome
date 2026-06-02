@@ -107,12 +107,12 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
 
     // Mode mapping using lookup table
     static constexpr uint8_t MODE_MAP[] = {
-    0x00, // 0x00 - unused
-    0x03, // 0x01 (Cool) -> 0x03
-    0x07, // 0x02 (Dry)  -> 0x07 
-    0x02, // 0x03 (Fan)  -> 0x02
-    0x01, // 0x04 (Heat) -> 0x01
-    0x08  // 0x05 (Auto) -> 0x08
+    0x00, // unused
+    0x03, // Cool
+    0x02, // Dry  → 0x02 (was 0x07)
+    0x07, // Fan  → 0x07 (was 0x02)
+    0x01, // Heat
+    0x08  // Auto
     };
 
     if (get_cmd_resp->data.mode < sizeof(MODE_MAP)) {
