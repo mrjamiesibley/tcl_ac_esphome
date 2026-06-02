@@ -101,7 +101,7 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
     m_set_cmd.data.on_timer_en = 0;
     m_set_cmd.data.beep = 1;
     m_set_cmd.data.disp = 1;
-    m_set_cmd.data.eco = 0;
+    m_set_cmd.data.eco = get_cmd_resp->data.eco;
     m_set_cmd.data.turbo = get_cmd_resp->data.turbo;
     m_set_cmd.data.mute = get_cmd_resp->data.mute;
 
@@ -225,7 +225,17 @@ void TCLClimate::control(const climate::ClimateCall &call) {
     get_cmd_resp_t get_cmd_resp = {0};
     memcpy(get_cmd_resp.raw, m_get_cmd_resp.raw, sizeof(get_cmd_resp.raw));
     bool should_build_cmd = false;
-
+    // Add this block to process the preset command
+    if (call.get_preset().has_value()) {
+        climate::ClimatePreset preset = *call.get_preset();
+        if (preset == climate::CLIMATE_PRESET_ECO) {
+            get_cmd_resp.data.eco = 1;
+        } else {
+            get_cmd_resp.data.eco = 0;
+        }
+        should_build_cmd = true;
+    }
+  
     if (call.get_mode().has_value()) {
         climate::ClimateMode climate_mode = *call.get_mode();
         ESP_LOGI("TCL", "Received mode control command: %d", static_cast<int>(climate_mode));
@@ -320,6 +330,8 @@ void TCLClimate::control(const climate::ClimateCall &call) {
 climate::ClimateTraits TCLClimate::traits() {
   auto traits = climate::ClimateTraits();
   traits.add_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
+  // Add this line to enable the Eco button in Home Assistant / ESPHome UI
+  traits.set_supported_presets({climate::CLIMATE_PRESET_NONE, climate::CLIMATE_PRESET_ECO});
   traits.set_supported_modes({
     climate::CLIMATE_MODE_OFF,
     climate::CLIMATE_MODE_COOL,
@@ -407,7 +419,7 @@ void TCLClimate::loop() {
 
             if (is_valid_xor(buffer, len)) {
                 print_hex_str(buffer, len);
-
+                
                 // Calculate current temperature
                 float curr_temp = ((static_cast<uint16_t>(buffer[17] << 8) | buffer[18]) / 374.0f - 32.0f) / 1.8f;
                 this->is_changed = false;
@@ -492,6 +504,13 @@ void TCLClimate::loop() {
 
                 this->set_target_temperature(static_cast<float>(m_get_cmd_resp.data.temp + 16));
                 this->set_current_temperature(curr_temp);
+
+                // Sync the hardware Eco status back to ESPHome
+                if (m_get_cmd_resp.data.eco) {
+                  this->preset = climate::CLIMATE_PRESET_ECO;
+                } else {
+                  this->preset = climate::CLIMATE_PRESET_NONE;
+                }
 
                 if (this->is_changed) {
                     this->publish_state();
