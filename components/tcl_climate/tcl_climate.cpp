@@ -107,12 +107,12 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
 
     // Mode mapping using lookup table
     static constexpr uint8_t MODE_MAP[] = {
-        0x00, // 0x00 - unused
-        0x03, // 0x01 -> 0x03
-        0x02, // 0x02 -> 0x02 (fan only)
-        0x07, // 0x03 -> 0x07 (dry)
-        0x01, // 0x04 -> 0x01 (heat)
-        0x08  // 0x05 -> 0x08 (auto)
+    0x00, // 0x00 - unused
+    0x03, // 0x01 (Cool) -> 0x03
+    0x07, // 0x02 (Dry)  -> 0x07 
+    0x02, // 0x03 (Fan)  -> 0x02
+    0x01, // 0x04 (Heat) -> 0x01
+    0x08  // 0x05 (Auto) -> 0x08
     };
 
     if (get_cmd_resp->data.mode < sizeof(MODE_MAP)) {
@@ -246,8 +246,8 @@ void TCLClimate::control(const climate::ClimateCall &call) {
             get_cmd_resp.data.power = 0x01;
             switch (climate_mode) {
                 case climate::CLIMATE_MODE_COOL:    get_cmd_resp.data.mode = 0x01; break;
-                case climate::CLIMATE_MODE_DRY:     get_cmd_resp.data.mode = 0x03; break;
-                case climate::CLIMATE_MODE_FAN_ONLY:get_cmd_resp.data.mode = 0x02; break;
+                case climate::CLIMATE_MODE_DRY:     get_cmd_resp.data.mode = 0x02; break;
+                case climate::CLIMATE_MODE_FAN_ONLY:get_cmd_resp.data.mode = 0x03; break;
                 case climate::CLIMATE_MODE_HEAT:
                 case climate::CLIMATE_MODE_HEAT_COOL:get_cmd_resp.data.mode = 0x04; break;
                 case climate::CLIMATE_MODE_AUTO:    get_cmd_resp.data.mode = 0x05; break;
@@ -428,13 +428,14 @@ void TCLClimate::loop() {
                 if (m_get_cmd_resp.data.power == 0x00) {
                     this->set_mode(climate::CLIMATE_MODE_OFF);
                 } else {
-                    static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
-                        {0x01, climate::CLIMATE_MODE_COOL},
-                        {0x03, climate::CLIMATE_MODE_DRY},
-                        {0x02, climate::CLIMATE_MODE_FAN_ONLY},
-                        {0x04, climate::CLIMATE_MODE_HEAT},
-                        {0x05, climate::CLIMATE_MODE_AUTO}
-                    };
+                    // Swap the map keys for DRY and FAN_ONLY
+                 static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
+                   {0x01, climate::CLIMATE_MODE_COOL},
+                   {0x02, climate::CLIMATE_MODE_DRY},      
+                   {0x03, climate::CLIMATE_MODE_FAN_ONLY}, 
+                   {0x04, climate::CLIMATE_MODE_HEAT},
+                   {0x05, climate::CLIMATE_MODE_AUTO}
+                };
                     auto it = MODE_MAP.find(m_get_cmd_resp.data.mode);
                     if (it != MODE_MAP.end()) {
                         this->set_mode(it->second);
