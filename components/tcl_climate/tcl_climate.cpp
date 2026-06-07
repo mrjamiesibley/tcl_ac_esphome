@@ -107,12 +107,12 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
 
     // Mode mapping using lookup table
     static constexpr uint8_t MODE_MAP[] = {
-    0x00, // unused
-    0x03, // Cool
-    0x02, // Dry  → 0x02 (was 0x07)
-    0x07, // Fan  → 0x07 (was 0x02)
-    0x01, // Heat
-    0x08  // Auto
+        0x00, // 0x00 - unused
+        0x03, // 0x01 -> 0x03
+        0x02, // 0x02 -> 0x02 (fan only)
+        0x07, // 0x03 -> 0x07 (dry)
+        0x01, // 0x04 -> 0x01 (heat)
+        0x08  // 0x05 -> 0x08 (auto)
     };
 
     if (get_cmd_resp->data.mode < sizeof(MODE_MAP)) {
@@ -225,17 +225,13 @@ void TCLClimate::control(const climate::ClimateCall &call) {
     get_cmd_resp_t get_cmd_resp = {0};
     memcpy(get_cmd_resp.raw, m_get_cmd_resp.raw, sizeof(get_cmd_resp.raw));
     bool should_build_cmd = false;
-    // Add this block to process the preset command
+
     if (call.get_preset().has_value()) {
         climate::ClimatePreset preset = *call.get_preset();
-        if (preset == climate::CLIMATE_PRESET_ECO) {
-            get_cmd_resp.data.eco = 1;
-        } else {
-            get_cmd_resp.data.eco = 0;
-        }
+        get_cmd_resp.data.eco = (preset == climate::CLIMATE_PRESET_ECO) ? 1 : 0;
         should_build_cmd = true;
     }
-  
+
     if (call.get_mode().has_value()) {
         climate::ClimateMode climate_mode = *call.get_mode();
         ESP_LOGI("TCL", "Received mode control command: %d", static_cast<int>(climate_mode));
@@ -246,8 +242,8 @@ void TCLClimate::control(const climate::ClimateCall &call) {
             get_cmd_resp.data.power = 0x01;
             switch (climate_mode) {
                 case climate::CLIMATE_MODE_COOL:    get_cmd_resp.data.mode = 0x01; break;
-                case climate::CLIMATE_MODE_DRY:     get_cmd_resp.data.mode = 0x02; break;
-                case climate::CLIMATE_MODE_FAN_ONLY:get_cmd_resp.data.mode = 0x03; break;
+                case climate::CLIMATE_MODE_DRY:     get_cmd_resp.data.mode = 0x03; break;
+                case climate::CLIMATE_MODE_FAN_ONLY:get_cmd_resp.data.mode = 0x02; break;
                 case climate::CLIMATE_MODE_HEAT:
                 case climate::CLIMATE_MODE_HEAT_COOL:get_cmd_resp.data.mode = 0x04; break;
                 case climate::CLIMATE_MODE_AUTO:    get_cmd_resp.data.mode = 0x05; break;
@@ -330,7 +326,6 @@ void TCLClimate::control(const climate::ClimateCall &call) {
 climate::ClimateTraits TCLClimate::traits() {
   auto traits = climate::ClimateTraits();
   traits.add_feature_flags(climate::CLIMATE_SUPPORTS_CURRENT_TEMPERATURE);
-  // Add this line to enable the Eco button in Home Assistant / ESPHome UI
   traits.set_supported_presets({climate::CLIMATE_PRESET_NONE, climate::CLIMATE_PRESET_ECO});
   traits.set_supported_modes({
     climate::CLIMATE_MODE_OFF,
@@ -419,23 +414,33 @@ void TCLClimate::loop() {
 
             if (is_valid_xor(buffer, len)) {
                 print_hex_str(buffer, len);
-                
-                // Calculate current temperature
-                float curr_temp = ((static_cast<uint16_t>(buffer[17] << 8) | buffer[18]) / 374.0f - 32.0f) / 1.8f;
+
+                // Current temperature - rate-limited to reject noise
+                // Also logs alternative byte position [16][17] for comparison
+                float curr_temp = (((uint16_t)buffer[17] << 8 | (uint16_t)buffer[18]) / 374.0f - 32.0f) / 1.8f;
+                float alt_temp  = (((uint16_t)buffer[16] << 8 | (uint16_t)buffer[17]) / 374.0f - 32.0f) / 1.8f;
+                ESP_LOGD("TCL", "Temp [17][18]=%.2f°C  [16][17]=%.2f°C", curr_temp, alt_temp);
+
+                // Reject readings that change faster than 1°C per update (noise suppression)
+                static float last_temp = NAN;
+                if (!isnan(last_temp) && std::abs(curr_temp - last_temp) > 1.0f) {
+                    curr_temp = last_temp; // hold last valid reading
+                } else {
+                    last_temp = curr_temp;
+                }
                 this->is_changed = false;
 
                 // Set mode
                 if (m_get_cmd_resp.data.power == 0x00) {
                     this->set_mode(climate::CLIMATE_MODE_OFF);
                 } else {
-                    // Swap the map keys for DRY and FAN_ONLY
-                 static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
-                   {0x01, climate::CLIMATE_MODE_COOL},
-                   {0x02, climate::CLIMATE_MODE_DRY},      
-                   {0x03, climate::CLIMATE_MODE_FAN_ONLY}, 
-                   {0x04, climate::CLIMATE_MODE_HEAT},
-                   {0x05, climate::CLIMATE_MODE_AUTO}
-                };
+                    static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
+                        {0x01, climate::CLIMATE_MODE_COOL},
+                        {0x02, climate::CLIMATE_MODE_DRY},      // GET 0x02 = DRY
+                        {0x03, climate::CLIMATE_MODE_FAN_ONLY}, // GET 0x03 = FAN
+                        {0x04, climate::CLIMATE_MODE_HEAT},
+                        {0x05, climate::CLIMATE_MODE_AUTO}
+                    };
                     auto it = MODE_MAP.find(m_get_cmd_resp.data.mode);
                     if (it != MODE_MAP.end()) {
                         this->set_mode(it->second);
@@ -506,11 +511,12 @@ void TCLClimate::loop() {
                 this->set_target_temperature(static_cast<float>(m_get_cmd_resp.data.temp + 16));
                 this->set_current_temperature(curr_temp);
 
-                // Sync the hardware Eco status back to ESPHome
-                if (m_get_cmd_resp.data.eco) {
-                  this->preset = climate::CLIMATE_PRESET_ECO;
-                } else {
-                  this->preset = climate::CLIMATE_PRESET_NONE;
+                // Eco readback - direct preset assignment, must track change manually
+                climate::ClimatePreset new_preset = m_get_cmd_resp.data.eco ?
+                    climate::CLIMATE_PRESET_ECO : climate::CLIMATE_PRESET_NONE;
+                if (this->preset != new_preset) {
+                    this->preset = new_preset;
+                    this->is_changed = true;
                 }
 
                 if (this->is_changed) {
