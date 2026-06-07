@@ -169,6 +169,9 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
 
 void TCLClimate::setup() {
   set_update_interval(UPDATE_INTERVAL_MS);
+  
+  // Add the custom fan modes here instead
+  this->set_supported_custom_fan_modes({"Turbo", "Mute", "Automatic", "1", "2", "3", "4", "5"});
 }
 
 // Swing control methods from old code
@@ -335,7 +338,6 @@ climate::ClimateTraits TCLClimate::traits() {
     climate::CLIMATE_MODE_DRY,
     climate::CLIMATE_MODE_AUTO
   });
-  traits.set_supported_custom_fan_modes({"Turbo", "Mute", "Automatic", "1", "2", "3", "4", "5"});
   traits.set_supported_swing_modes({
     climate::CLIMATE_SWING_OFF,
     climate::CLIMATE_SWING_BOTH,
@@ -415,29 +417,27 @@ void TCLClimate::loop() {
             if (is_valid_xor(buffer, len)) {
                 print_hex_str(buffer, len);
 
-                // Current temperature - rate-limited to reject noise
-                // Also logs alternative byte position [16][17] for comparison
                 float curr_temp = (((uint16_t)buffer[17] << 8 | (uint16_t)buffer[18]) / 374.0f - 32.0f) / 1.8f;
                 float alt_temp  = (((uint16_t)buffer[16] << 8 | (uint16_t)buffer[17]) / 374.0f - 32.0f) / 1.8f;
                 ESP_LOGD("TCL", "Temp [17][18]=%.2f°C  [16][17]=%.2f°C", curr_temp, alt_temp);
 
-                // Reject readings that change faster than 1°C per update (noise suppression)
                 static float last_temp = NAN;
-                if (!isnan(last_temp) && std::abs(curr_temp - last_temp) > 1.0f) {
-                    curr_temp = last_temp; // hold last valid reading
+                
+                // Fixed: Added std:: prefix to isnan
+                if (!std::isnan(last_temp) && std::abs(curr_temp - last_temp) > 1.0f) {
+                    curr_temp = last_temp; 
                 } else {
                     last_temp = curr_temp;
                 }
                 this->is_changed = false;
 
-                // Set mode
                 if (m_get_cmd_resp.data.power == 0x00) {
                     this->set_mode(climate::CLIMATE_MODE_OFF);
                 } else {
                     static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
                         {0x01, climate::CLIMATE_MODE_COOL},
-                        {0x02, climate::CLIMATE_MODE_FAN_ONLY}, // Corrected: GET 0x02 is FAN
-                        {0x03, climate::CLIMATE_MODE_DRY},      // Corrected: GET 0x03 is DRY
+                        {0x02, climate::CLIMATE_MODE_FAN_ONLY}, 
+                        {0x03, climate::CLIMATE_MODE_DRY},      
                         {0x04, climate::CLIMATE_MODE_HEAT},
                         {0x05, climate::CLIMATE_MODE_AUTO}
                     };
@@ -446,9 +446,7 @@ void TCLClimate::loop() {
                         this->set_mode(it->second);
                     }
                 }
-                }
 
-                // Set fan mode
                 static const std::map<uint8_t, std::string> FAN_MODE_MAP = {
                     {0x00, "Automatic"},
                     {0x01, "1"},
@@ -461,22 +459,19 @@ void TCLClimate::loop() {
                 StringRef current_fan(StringRef(this->get_custom_fan_mode()));
 
                 if (m_get_cmd_resp.data.turbo) {
-                  // String literal to StringRef - use explicit construction
                   this->set_custom_fan_mode(StringRef("Turbo"));
                 } else if (m_get_cmd_resp.data.mute) {
                   this->set_custom_fan_mode(StringRef("Mute"));
                 } else {
                   auto it = FAN_MODE_MAP.find(m_get_cmd_resp.data.fan);
                   if (it != FAN_MODE_MAP.end()) {
-                    StringRef current_fan(StringRef(this->get_custom_fan_mode()));
-                    if (current_fan.empty() || current_fan != it->second) {
-                      // Convert std::string to StringRef
+                    StringRef current_fan_ref(StringRef(this->get_custom_fan_mode()));
+                    if (current_fan_ref.empty() || current_fan_ref != it->second) {
                       this->set_custom_fan_mode(StringRef(it->second.c_str(), it->second.size()));
                     }
                   }
                 }
 
-                // Set swing mode - extracted from old code
                 if (m_get_cmd_resp.data.hswing && m_get_cmd_resp.data.vswing) {
                     this->set_swing_mode(climate::CLIMATE_SWING_BOTH);
                 } else if (!m_get_cmd_resp.data.hswing && !m_get_cmd_resp.data.vswing) {
@@ -487,7 +482,6 @@ void TCLClimate::loop() {
                     this->set_swing_mode(climate::CLIMATE_SWING_HORIZONTAL);
                 }
 
-                // Set swing positions - extracted from old code
                 if (m_get_cmd_resp.data.vswing_mv == 0x01) set_vswing_pos("Move full");
                 else if (m_get_cmd_resp.data.vswing_mv == 0x02) set_vswing_pos("Move upper");
                 else if (m_get_cmd_resp.data.vswing_mv == 0x03) set_vswing_pos("Move lower");
@@ -512,7 +506,6 @@ void TCLClimate::loop() {
                 this->set_target_temperature(static_cast<float>(m_get_cmd_resp.data.temp + 16));
                 this->set_current_temperature(curr_temp);
 
-                // Eco readback - direct preset assignment, must track change manually
                 climate::ClimatePreset new_preset = m_get_cmd_resp.data.eco ?
                     climate::CLIMATE_PRESET_ECO : climate::CLIMATE_PRESET_NONE;
                 if (this->preset != new_preset) {
@@ -523,11 +516,7 @@ void TCLClimate::loop() {
                 if (this->is_changed) {
                     this->publish_state();
                 }
-            }
-        }
-    }
+            } // Properly closes is_valid_xor
+        } // Properly closes sizeof check
+    } // Properly closes while loop
 }
-
-}  // namespace tcl_climate
-}  // namespace esphome
-//#endif  // USE_ARDUINO
