@@ -436,8 +436,8 @@ void TCLClimate::loop() {
                 } else {
                     static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
                         {0x01, climate::CLIMATE_MODE_COOL},
-                        {0x02, climate::CLIMATE_MODE_DRY},      // GET 0x02 = DRY
-                        {0x03, climate::CLIMATE_MODE_FAN_ONLY}, // GET 0x03 = FAN
+                        {0x02, climate::CLIMATE_MODE_FAN_ONLY}, // Corrected: GET 0x02 is FAN
+                        {0x03, climate::CLIMATE_MODE_DRY},      // Corrected: GET 0x03 is DRY
                         {0x04, climate::CLIMATE_MODE_HEAT},
                         {0x05, climate::CLIMATE_MODE_AUTO}
                     };
@@ -445,6 +445,7 @@ void TCLClimate::loop() {
                     if (it != MODE_MAP.end()) {
                         this->set_mode(it->second);
                     }
+                }
                 }
 
                 // Set fan mode
