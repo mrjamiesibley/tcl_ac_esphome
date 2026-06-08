@@ -170,7 +170,7 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
 
 void TCLClimate::setup() {
   set_update_interval(UPDATE_INTERVAL_MS);
-  this->set_supported_custom_fan_modes(std::set<std::string>{"Turbo", "Mute", "Automatic", "1", "2", "3", "4", "5"});
+  this->set_supported_custom_fan_modes({"Turbo", "Mute", "Automatic", "1", "2", "3", "4", "5"});
 }
 
 // Swing control methods from old code
