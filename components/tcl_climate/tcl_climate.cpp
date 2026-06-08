@@ -4,7 +4,7 @@
 #include "esphome/core/helpers.h"
 #include "tcl_climate.h"
 #include <map>  // Add this include
-#include <set
+#include <set>
 
 namespace esphome {
 namespace tcl_climate {
