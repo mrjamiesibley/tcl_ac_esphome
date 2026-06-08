@@ -14,6 +14,11 @@ class TCLClimate : public climate::Climate, public uart::UARTDevice, public Poll
   TCLClimate() : PollingComponent() {}  // Default constructor for PollingComponent
 
   bool is_changed : 1;
+  bool display_on = true;
+  bool beep_on = true;
+
+  void set_display(bool on) { display_on = on; }
+  void set_beep(bool on) { beep_on = on; }
   // Swing position strings
   std::string hswing_pos = "";
   std::string vswing_pos = "";
