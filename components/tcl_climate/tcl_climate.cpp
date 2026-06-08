@@ -519,6 +519,10 @@ void TCLClimate::loop() {
                     this->preset = new_preset;
                     this->is_changed = true;
                 }
+                if ((bool)m_get_cmd_resp.data.disp != display_on) {
+                    display_on = (bool)m_get_cmd_resp.data.disp;
+                   this->is_changed = true;
+                }
 
                 if (this->is_changed) {
                     this->publish_state();
