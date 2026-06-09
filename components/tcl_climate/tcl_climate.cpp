@@ -412,7 +412,11 @@ void TCLClimate::loop() {
     while (available()) {
         int len = read_data_line(read(), buffer, MAX_LINE_LENGTH);
 
-        if(ready_to_send_set_cmd_flag ) return; // do not process a status report line if we have an outgoing command waiting
+        if(ready_to_send_set_cmd_flag ) 
+        {
+           ESP_LOGD("TCL", "Skipping status report processing due to a waiting command.");
+          return; // do not process a status report line if we have an outgoing command waiting
+        }
       
         if (len == sizeof(m_get_cmd_resp) && buffer[3] == 0x04) {
             memcpy(m_get_cmd_resp.raw, buffer, len);
