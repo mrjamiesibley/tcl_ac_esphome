@@ -95,18 +95,18 @@ void TCLClimate::set_target_temperature(float target_temperature) {
   this->target_temperature = target_temperature;
 }
 
-void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
+void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
     memcpy(m_set_cmd.raw, set_cmd_base, sizeof(m_set_cmd.raw));
 
     // Manual assignment instead of struct initialization
-    m_set_cmd.data.power = get_cmd_resp->data.power;
+    m_set_cmd.data.power = desired_ac_status->data.power;
     m_set_cmd.data.off_timer_en = 0;
     m_set_cmd.data.on_timer_en = 0;
     m_set_cmd.data.beep = beep_on ? 1 : 0;
     m_set_cmd.data.disp = display_on ? 1 : 0;
-    m_set_cmd.data.eco = get_cmd_resp->data.eco;
-    m_set_cmd.data.turbo = get_cmd_resp->data.turbo;
-    m_set_cmd.data.mute = get_cmd_resp->data.mute;
+    m_set_cmd.data.eco = desired_ac_status->data.eco;
+    m_set_cmd.data.turbo = desired_ac_status->data.turbo;
+    m_set_cmd.data.mute = desired_ac_status->data.mute;
 
     // Mode mapping using lookup table
     static constexpr uint8_t MODE_MAP[] = {
@@ -118,12 +118,12 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
         0x08  // 0x05 -> 0x08 (auto)
     };
 
-    if (get_cmd_resp->data.mode < sizeof(MODE_MAP)) {
-        m_set_cmd.data.mode = MODE_MAP[get_cmd_resp->data.mode];
+    if (desired_ac_status->data.mode < sizeof(MODE_MAP)) {
+        m_set_cmd.data.mode = MODE_MAP[desired_ac_status->data.mode];
     }
 
     // Temperature conversion
-    m_set_cmd.data.temp = 15 - get_cmd_resp->data.temp;
+    m_set_cmd.data.temp = 15 - desired_ac_status->data.temp;
 
     // Fan mode mapping using lookup table
     static constexpr uint8_t FAN_MAP[] = {
@@ -135,28 +135,28 @@ void TCLClimate::build_set_cmd(get_cmd_resp_t *get_cmd_resp) {
         0x07  // 0x05 -> 0x07 (speed 4)
     };
 
-    if (get_cmd_resp->data.fan < sizeof(FAN_MAP)) {
-        m_set_cmd.data.fan = FAN_MAP[get_cmd_resp->data.fan];
+    if (desired_ac_status->data.fan < sizeof(FAN_MAP)) {
+        m_set_cmd.data.fan = FAN_MAP[desired_ac_status->data.fan];
     }
 
     // Swing control - extracted from old code
-    if (get_cmd_resp->data.vswing_mv) {
+    if (desired_ac_status->data.vswing_mv) {
       m_set_cmd.data.vswing = 0x07;
       m_set_cmd.data.vswing_fix = 0;
-      m_set_cmd.data.vswing_mv = get_cmd_resp->data.vswing_mv;
-    } else if (get_cmd_resp->data.vswing_fix) {
+      m_set_cmd.data.vswing_mv = desired_ac_status->data.vswing_mv;
+    } else if (desired_ac_status->data.vswing_fix) {
       m_set_cmd.data.vswing = 0;
-      m_set_cmd.data.vswing_fix = get_cmd_resp->data.vswing_fix;
+      m_set_cmd.data.vswing_fix = desired_ac_status->data.vswing_fix;
       m_set_cmd.data.vswing_mv = 0;
     }
 
-    if (get_cmd_resp->data.hswing_mv) {
+    if (desired_ac_status->data.hswing_mv) {
       m_set_cmd.data.hswing = 0x01;
       m_set_cmd.data.hswing_fix = 0;
-      m_set_cmd.data.hswing_mv = get_cmd_resp->data.hswing_mv;
-    } else if (get_cmd_resp->data.hswing_fix) {
+      m_set_cmd.data.hswing_mv = desired_ac_status->data.hswing_mv;
+    } else if (desired_ac_status->data.hswing_fix) {
       m_set_cmd.data.hswing = 0;
-      m_set_cmd.data.hswing_fix = get_cmd_resp->data.hswing_fix;
+      m_set_cmd.data.hswing_fix = desired_ac_status->data.hswing_fix;
       m_set_cmd.data.hswing_mv = 0;
     }
 
@@ -178,62 +178,62 @@ void TCLClimate::setup() {
 // Swing control methods from old code
 void TCLClimate::control_vertical_swing(const std::string &swing_mode) {
 
-  get_cmd_resp_t get_cmd_resp = {0};
-  memcpy(get_cmd_resp.raw, last_ac_status.raw, sizeof(get_cmd_resp.raw));
+  desired_ac_status_t desired_ac_status = {0};
+  memcpy(desired_ac_status.raw, last_ac_status.raw, sizeof(desired_ac_status.raw));
 
-  get_cmd_resp.data.vswing_mv = 0;
-  get_cmd_resp.data.vswing_fix = 0;
+  desired_ac_status.data.vswing_mv = 0;
+  desired_ac_status.data.vswing_fix = 0;
 
-  if (swing_mode == "Move full") get_cmd_resp.data.vswing_mv = 0x01;
-  else if (swing_mode == "Move upper")  get_cmd_resp.data.vswing_mv = 0x02;
-  else if (swing_mode == "Move lower")  get_cmd_resp.data.vswing_mv = 0x03;
-  else if (swing_mode == "Fix top") get_cmd_resp.data.vswing_fix = 0x01;
-  else if (swing_mode == "Fix upper") get_cmd_resp.data.vswing_fix = 0x02;
-  else if (swing_mode == "Fix mid") get_cmd_resp.data.vswing_fix = 0x03;
-  else if (swing_mode == "Fix lower") get_cmd_resp.data.vswing_fix = 0x04;
-  else if (swing_mode == "Fix bottom") get_cmd_resp.data.vswing_fix = 0x05;
+  if (swing_mode == "Move full") desired_ac_status.data.vswing_mv = 0x01;
+  else if (swing_mode == "Move upper")  desired_ac_status.data.vswing_mv = 0x02;
+  else if (swing_mode == "Move lower")  desired_ac_status.data.vswing_mv = 0x03;
+  else if (swing_mode == "Fix top") desired_ac_status.data.vswing_fix = 0x01;
+  else if (swing_mode == "Fix upper") desired_ac_status.data.vswing_fix = 0x02;
+  else if (swing_mode == "Fix mid") desired_ac_status.data.vswing_fix = 0x03;
+  else if (swing_mode == "Fix lower") desired_ac_status.data.vswing_fix = 0x04;
+  else if (swing_mode == "Fix bottom") desired_ac_status.data.vswing_fix = 0x05;
 
-  if (get_cmd_resp.data.vswing_mv) get_cmd_resp.data.vswing = 0x01;
-  else get_cmd_resp.data.vswing = 0;
+  if (desired_ac_status.data.vswing_mv) desired_ac_status.data.vswing = 0x01;
+  else desired_ac_status.data.vswing = 0;
 
-  build_set_cmd(&get_cmd_resp);
+  build_set_cmd(&desired_ac_status);
   ready_to_send_set_cmd_flag = true;
 }
 
 void TCLClimate::control_horizontal_swing(const std::string &swing_mode) {
 
-  get_cmd_resp_t get_cmd_resp = {0};
-  memcpy(get_cmd_resp.raw, last_ac_status.raw, sizeof(get_cmd_resp.raw));
+  desired_ac_status_t desired_ac_status = {0};
+  memcpy(desired_ac_status.raw, last_ac_status.raw, sizeof(desired_ac_status.raw));
 
-  get_cmd_resp.data.hswing_mv = 0;
-  get_cmd_resp.data.hswing_fix = 0;
+  desired_ac_status.data.hswing_mv = 0;
+  desired_ac_status.data.hswing_fix = 0;
 
-  if (swing_mode == "Move full") get_cmd_resp.data.hswing_mv = 0x01;
-  else if (swing_mode == "Move left") get_cmd_resp.data.hswing_mv = 0x02;
-  else if (swing_mode == "Move mid") get_cmd_resp.data.hswing_mv = 0x03;
-  else if (swing_mode == "Move right") get_cmd_resp.data.hswing_mv = 0x04;
-  else if (swing_mode == "Fix left") get_cmd_resp.data.hswing_fix = 0x01;
-  else if (swing_mode == "Fix mid left") get_cmd_resp.data.hswing_fix = 0x02;
-  else if (swing_mode == "Fix mid") get_cmd_resp.data.hswing_fix = 0x03;
-  else if (swing_mode == "Fix mid right") get_cmd_resp.data.hswing_fix = 0x04;
-  else if (swing_mode == "Fix right") get_cmd_resp.data.hswing_fix = 0x05;
+  if (swing_mode == "Move full") desired_ac_status.data.hswing_mv = 0x01;
+  else if (swing_mode == "Move left") desired_ac_status.data.hswing_mv = 0x02;
+  else if (swing_mode == "Move mid") desired_ac_status.data.hswing_mv = 0x03;
+  else if (swing_mode == "Move right") desired_ac_status.data.hswing_mv = 0x04;
+  else if (swing_mode == "Fix left") desired_ac_status.data.hswing_fix = 0x01;
+  else if (swing_mode == "Fix mid left") desired_ac_status.data.hswing_fix = 0x02;
+  else if (swing_mode == "Fix mid") desired_ac_status.data.hswing_fix = 0x03;
+  else if (swing_mode == "Fix mid right") desired_ac_status.data.hswing_fix = 0x04;
+  else if (swing_mode == "Fix right") desired_ac_status.data.hswing_fix = 0x05;
 
-  if (get_cmd_resp.data.hswing_mv) get_cmd_resp.data.hswing = 0x01;
-  else get_cmd_resp.data.hswing = 0;
+  if (desired_ac_status.data.hswing_mv) desired_ac_status.data.hswing = 0x01;
+  else desired_ac_status.data.hswing = 0;
 
-  build_set_cmd(&get_cmd_resp);
+  build_set_cmd(&desired_ac_status);
   ready_to_send_set_cmd_flag = true;
 
 }
 
 void TCLClimate::control(const climate::ClimateCall &call) {
-    get_cmd_resp_t get_cmd_resp = {0};
-    memcpy(get_cmd_resp.raw, last_ac_status.raw, sizeof(get_cmd_resp.raw));
+    desired_ac_status_t desired_ac_status = {0};
+    memcpy(desired_ac_status.raw, last_ac_status.raw, sizeof(desired_ac_status.raw));
     bool should_build_cmd = false;
 
     if (call.get_preset().has_value()) {
         climate::ClimatePreset preset = *call.get_preset();
-        get_cmd_resp.data.eco = (preset == climate::CLIMATE_PRESET_ECO) ? 1 : 0;
+        desired_ac_status.data.eco = (preset == climate::CLIMATE_PRESET_ECO) ? 1 : 0;
         should_build_cmd = true;
     }
 
@@ -242,16 +242,16 @@ void TCLClimate::control(const climate::ClimateCall &call) {
         ESP_LOGI("TCL", "Received mode control command: %d", static_cast<int>(climate_mode));
 
         if (climate_mode == climate::CLIMATE_MODE_OFF) {
-            get_cmd_resp.data.power = 0x00;
+            desired_ac_status.data.power = 0x00;
         } else {
-            get_cmd_resp.data.power = 0x01;
+            desired_ac_status.data.power = 0x01;
             switch (climate_mode) {
-                case climate::CLIMATE_MODE_COOL:    get_cmd_resp.data.mode = 0x01; break;
-                case climate::CLIMATE_MODE_DRY:     get_cmd_resp.data.mode = 0x03; break;
-                case climate::CLIMATE_MODE_FAN_ONLY:get_cmd_resp.data.mode = 0x02; break;
+                case climate::CLIMATE_MODE_COOL:    desired_ac_status.data.mode = 0x01; break;
+                case climate::CLIMATE_MODE_DRY:     desired_ac_status.data.mode = 0x03; break;
+                case climate::CLIMATE_MODE_FAN_ONLY:desired_ac_status.data.mode = 0x02; break;
                 case climate::CLIMATE_MODE_HEAT:
-                case climate::CLIMATE_MODE_HEAT_COOL:get_cmd_resp.data.mode = 0x04; break;
-                case climate::CLIMATE_MODE_AUTO:    get_cmd_resp.data.mode = 0x05; break;
+                case climate::CLIMATE_MODE_HEAT_COOL:desired_ac_status.data.mode = 0x04; break;
+                case climate::CLIMATE_MODE_AUTO:    desired_ac_status.data.mode = 0x05; break;
                 default: break;
             }
         }
@@ -262,7 +262,7 @@ void TCLClimate::control(const climate::ClimateCall &call) {
         float temp = *call.get_target_temperature();
         ESP_LOGI("TCL", "Received temperature control command: %.1f°C", temp);
 
-        get_cmd_resp.data.temp = static_cast<uint8_t>(temp) - 16;
+        desired_ac_status.data.temp = static_cast<uint8_t>(temp) - 16;
         should_build_cmd = true;
     }
 
@@ -271,20 +271,20 @@ void TCLClimate::control(const climate::ClimateCall &call) {
 
         switch(swing_mode) {
             case climate::CLIMATE_SWING_OFF:
-                get_cmd_resp.data.hswing = 0;
-                get_cmd_resp.data.vswing = 0;
+                desired_ac_status.data.hswing = 0;
+                desired_ac_status.data.vswing = 0;
                 break;
             case climate::CLIMATE_SWING_BOTH:
-                get_cmd_resp.data.hswing = 1;
-                get_cmd_resp.data.vswing = 1;
+                desired_ac_status.data.hswing = 1;
+                desired_ac_status.data.vswing = 1;
                 break;
             case climate::CLIMATE_SWING_VERTICAL:
-                get_cmd_resp.data.hswing = 0;
-                get_cmd_resp.data.vswing = 1;
+                desired_ac_status.data.hswing = 0;
+                desired_ac_status.data.vswing = 1;
                 break;
             case climate::CLIMATE_SWING_HORIZONTAL:
-                get_cmd_resp.data.hswing = 1;
-                get_cmd_resp.data.vswing = 0;
+                desired_ac_status.data.hswing = 1;
+                desired_ac_status.data.vswing = 0;
                 break;
         }
         should_build_cmd = true;
@@ -296,8 +296,8 @@ void TCLClimate::control(const climate::ClimateCall &call) {
         std::string fan_mode(custom_fan_mode.c_str());
         ESP_LOGI("TCL", "Received fan mode control command: %s", fan_mode.c_str());
 
-        get_cmd_resp.data.turbo = 0x00;
-        get_cmd_resp.data.mute = 0x00;
+        desired_ac_status.data.turbo = 0x00;
+        desired_ac_status.data.mute = 0x00;
 
         // Use map for fan mode parsing
         static const std::map<std::string, std::pair<uint8_t, uint8_t>> FAN_MODE_MAP = {
@@ -313,9 +313,9 @@ void TCLClimate::control(const climate::ClimateCall &call) {
 
         auto it = FAN_MODE_MAP.find(fan_mode);
         if (it != FAN_MODE_MAP.end()) {
-            get_cmd_resp.data.fan = it->second.first;
-            if (fan_mode == "Turbo") get_cmd_resp.data.turbo = 0x01;
-            else if (fan_mode == "Mute") get_cmd_resp.data.mute = 0x01;
+            desired_ac_status.data.fan = it->second.first;
+            if (fan_mode == "Turbo") desired_ac_status.data.turbo = 0x01;
+            else if (fan_mode == "Mute") desired_ac_status.data.mute = 0x01;
         }
         should_build_cmd = true;
     }
@@ -323,10 +323,10 @@ void TCLClimate::control(const climate::ClimateCall &call) {
     if (should_build_cmd) {
         ESP_LOGI("TCL", "Building command to AC unit");
 
-        build_set_cmd(&get_cmd_resp);
+        build_set_cmd(&desired_ac_status);
         ready_to_send_set_cmd_flag = true;
 
-       memcpy(last_ac_status.raw, get_cmd_resp.raw, sizeof(last_ac_status.raw)); // copy draft array back into recieve_tx_array
+       memcpy(last_ac_status.raw, desired_ac_status.raw, sizeof(last_ac_status.raw)); // copy draft array back into recieve_tx_array
     }
 }
 
