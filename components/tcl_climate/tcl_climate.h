@@ -23,7 +23,7 @@ class TCLClimate : public climate::Climate, public uart::UARTDevice, public Poll
   std::string hswing_pos = "";
   std::string vswing_pos = "";
 
-  union get_cmd_resp_t {
+  union desired_ac_status_t {
     struct {
       uint8_t header;
       uint8_t byte_1;
@@ -198,7 +198,7 @@ class TCLClimate : public climate::Climate, public uart::UARTDevice, public Poll
   bool ready_to_send_set_cmd_flag = false;
 
   uint8_t set_cmd_base[35] = {0xBB, 0x00, 0x01, 0x03, 0x1D, 0x00, 0x00, 0x64, 0x03, 0xF3, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-  get_cmd_resp_t last_ac_status = {0};
+  desired_ac_status_t last_ac_status = {0};
   set_cmd_t m_set_cmd = {0};
 
   void set_current_temperature(float current_temperature);
@@ -213,7 +213,7 @@ class TCLClimate : public climate::Climate, public uart::UARTDevice, public Poll
   void control_vertical_swing(const std::string &swing_mode);
   void control_horizontal_swing(const std::string &swing_mode);
 
-  void build_set_cmd(get_cmd_resp_t *get_cmd_resp);
+  void build_set_cmd(desired_ac_status_t *desired_ac_status);
 
   void setup() override;
   void control(const climate::ClimateCall &call) override;
