@@ -538,9 +538,9 @@ void TCLClimate::loop() {
                     this->is_changed = true;
                 }
 
-                if (this->is_changed) {
+                //if (this->is_changed) {
                     this->publish_state();
-                }
+               // }
 
                 ESP_LOGD("TCL", "RX HVAC Power %i ", last_ac_status.data.power);
                 ESP_LOGD("TCL", "RX HVAC Mode %i ", last_ac_status.data.mode);
