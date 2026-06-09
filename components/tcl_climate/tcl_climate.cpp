@@ -429,9 +429,15 @@ void TCLClimate::loop() {
             if (is_valid_xor(buffer, len)) {
                 print_hex_str(buffer, len);
 
-                  if(ready_to_send_set_cmd_flag || skip_next_update) 
+                  if(ready_to_send_set_cmd_flag ) 
                   {
                      ESP_LOGD("TCL", "Skipping status report processing due to a waiting command.");
+                     return; // do not process a status report line if we have an outgoing command waiting
+                  }
+
+                  if( skip_next_update) 
+                  {
+                     ESP_LOGD("TCL", "Skipping status report processing due to a recent command.");
                      return; // do not process a status report line if we have an outgoing command waiting
                   }
 
