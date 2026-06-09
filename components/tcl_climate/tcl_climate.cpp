@@ -96,17 +96,17 @@ void TCLClimate::set_target_temperature(float target_temperature) {
 }
 
 void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
-    memcpy(m_set_cmd.raw, set_cmd_base, sizeof(m_set_cmd.raw));
+    memcpy(outgoing_tx_command.raw, set_cmd_base, sizeof(outgoing_tx_command.raw));
 
     // Manual assignment instead of struct initialization
-    m_set_cmd.data.power = desired_ac_status->data.power;
-    m_set_cmd.data.off_timer_en = 0;
-    m_set_cmd.data.on_timer_en = 0;
-    m_set_cmd.data.beep = beep_on ? 1 : 0;
-    m_set_cmd.data.disp = display_on ? 1 : 0;
-    m_set_cmd.data.eco = desired_ac_status->data.eco;
-    m_set_cmd.data.turbo = desired_ac_status->data.turbo;
-    m_set_cmd.data.mute = desired_ac_status->data.mute;
+    outgoing_tx_command.data.power = desired_ac_status->data.power;
+    outgoing_tx_command.data.off_timer_en = 0;
+    outgoing_tx_command.data.on_timer_en = 0;
+    outgoing_tx_command.data.beep = beep_on ? 1 : 0;
+    outgoing_tx_command.data.disp = display_on ? 1 : 0;
+    outgoing_tx_command.data.eco = desired_ac_status->data.eco;
+    outgoing_tx_command.data.turbo = desired_ac_status->data.turbo;
+    outgoing_tx_command.data.mute = desired_ac_status->data.mute;
 
     // Mode mapping using lookup table
     static constexpr uint8_t MODE_MAP[] = {
@@ -119,11 +119,11 @@ void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
     };
 
     if (desired_ac_status->data.mode < sizeof(MODE_MAP)) {
-        m_set_cmd.data.mode = MODE_MAP[desired_ac_status->data.mode];
+        outgoing_tx_command.data.mode = MODE_MAP[desired_ac_status->data.mode];
     }
 
     // Temperature conversion
-    m_set_cmd.data.temp = 15 - desired_ac_status->data.temp;
+    outgoing_tx_command.data.temp = 15 - desired_ac_status->data.temp;
 
     // Fan mode mapping using lookup table
     static constexpr uint8_t FAN_MAP[] = {
@@ -136,38 +136,38 @@ void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
     };
 
     if (desired_ac_status->data.fan < sizeof(FAN_MAP)) {
-        m_set_cmd.data.fan = FAN_MAP[desired_ac_status->data.fan];
+        outgoing_tx_command.data.fan = FAN_MAP[desired_ac_status->data.fan];
     }
 
     // Swing control - extracted from old code
     if (desired_ac_status->data.vswing_mv) {
-      m_set_cmd.data.vswing = 0x07;
-      m_set_cmd.data.vswing_fix = 0;
-      m_set_cmd.data.vswing_mv = desired_ac_status->data.vswing_mv;
+      outgoing_tx_command.data.vswing = 0x07;
+      outgoing_tx_command.data.vswing_fix = 0;
+      outgoing_tx_command.data.vswing_mv = desired_ac_status->data.vswing_mv;
     } else if (desired_ac_status->data.vswing_fix) {
-      m_set_cmd.data.vswing = 0;
-      m_set_cmd.data.vswing_fix = desired_ac_status->data.vswing_fix;
-      m_set_cmd.data.vswing_mv = 0;
+      outgoing_tx_command.data.vswing = 0;
+      outgoing_tx_command.data.vswing_fix = desired_ac_status->data.vswing_fix;
+      outgoing_tx_command.data.vswing_mv = 0;
     }
 
     if (desired_ac_status->data.hswing_mv) {
-      m_set_cmd.data.hswing = 0x01;
-      m_set_cmd.data.hswing_fix = 0;
-      m_set_cmd.data.hswing_mv = desired_ac_status->data.hswing_mv;
+      outgoing_tx_command.data.hswing = 0x01;
+      outgoing_tx_command.data.hswing_fix = 0;
+      outgoing_tx_command.data.hswing_mv = desired_ac_status->data.hswing_mv;
     } else if (desired_ac_status->data.hswing_fix) {
-      m_set_cmd.data.hswing = 0;
-      m_set_cmd.data.hswing_fix = desired_ac_status->data.hswing_fix;
-      m_set_cmd.data.hswing_mv = 0;
+      outgoing_tx_command.data.hswing = 0;
+      outgoing_tx_command.data.hswing_fix = desired_ac_status->data.hswing_fix;
+      outgoing_tx_command.data.hswing_mv = 0;
     }
 
-    m_set_cmd.data.half_degree = 0;
+    outgoing_tx_command.data.half_degree = 0;
 
     // Calculate XOR checksum
     uint8_t xor_byte = 0;
-    for (size_t i = 0; i < sizeof(m_set_cmd.raw) - 1; i++) {
-        xor_byte ^= m_set_cmd.raw[i];
+    for (size_t i = 0; i < sizeof(outgoing_tx_command.raw) - 1; i++) {
+        xor_byte ^= outgoing_tx_command.raw[i];
     }
-    m_set_cmd.raw[sizeof(m_set_cmd.raw) - 1] = xor_byte;
+    outgoing_tx_command.raw[sizeof(outgoing_tx_command.raw) - 1] = xor_byte;
 }
 
 void TCLClimate::setup() {
@@ -357,7 +357,7 @@ climate::ClimateTraits TCLClimate::traits() {
 void TCLClimate::update() {
     if (ready_to_send_set_cmd_flag) {
         ready_to_send_set_cmd_flag = false;
-        write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw));
+        write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
         ESP_LOGI("TCL", "Sending command to AC unit");
       skip_next_update = true;
     } else {
