@@ -436,11 +436,11 @@ void TCLClimate::loop() {
                      return; // do not process a status report line if we have an outgoing command waiting
                   }
 
-                  if( skip_next_update) 
-                  {
-                     ESP_LOGD("TCL", "Skipping status report processing due to a recent command.");
-                     return; // do not process a status report line if we have an outgoing command waiting
-                  }
+                //  if( skip_next_update) 
+                //  {
+                   //  ESP_LOGD("TCL", "Skipping status report processing due to a recent command.");
+                    // return; // do not process a status report line if we have an outgoing command waiting
+                 // }
 
                 // Current temperature - rate-limited to reject noise
                 // Also logs alternative byte position [16][17] for comparison
