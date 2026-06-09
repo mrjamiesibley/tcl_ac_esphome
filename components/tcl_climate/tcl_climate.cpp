@@ -14,7 +14,7 @@ static constexpr uint8_t REQ_CMD[] = {0xBB, 0x00, 0x01, 0x04, 0x02, 0x01, 0x00, 
 static constexpr int MAX_LINE_LENGTH = 100;
 static constexpr int UPDATE_INTERVAL_MS = 450;
 
-bool skip_next_update = false;
+//bool skip_next_update = false;
 
 void TCLClimate::set_current_temperature(float current_temperature) {
   if (std::abs(this->current_temperature - current_temperature) < 0.01f) return; //no change
@@ -320,9 +320,12 @@ void TCLClimate::control(const climate::ClimateCall &call) {
         ESP_LOGI("TCL", "Building command to AC unit");
 
         build_set_cmd(&desired_ac_status);
-        ready_to_send_set_cmd_flag = true;
-
+        //ready_to_send_set_cmd_flag = true;
+       
        memcpy(last_ac_status.raw, desired_ac_status.raw, sizeof(last_ac_status.raw)); // copy draft array back into recieve_tx_array
+
+       write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
+      ESP_LOGI("TCL", "Sending command to AC unit");
     }
 }
 
@@ -353,17 +356,17 @@ climate::ClimateTraits TCLClimate::traits() {
 void TCLClimate::update() {
     if (ready_to_send_set_cmd_flag) {
         ready_to_send_set_cmd_flag = false;
-        write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
-        ESP_LOGI("TCL", "Sending command to AC unit");
-        skip_next_update = true;  // the AC takes a while to respond to our command, and the first status report back usualy contains the old AC state
+        //write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
+        //ESP_LOGI("TCL", "Sending command to AC unit");
+        //skip_next_update = true;  // the AC takes a while to respond to our command, and the first status report back usualy contains the old AC state
     } else {
 
-        if( skip_next_update)
-        {
-          skip_next_update = false;
-          ESP_LOGI("TCL", "Skipping 1 status update request.");
-          return;
-        }
+       // if( skip_next_update)
+       // {
+         // skip_next_update = false;
+          //ESP_LOGI("TCL", "Skipping 1 status update request.");
+         // return;
+       // }
         write_array(REQ_CMD, sizeof(REQ_CMD));
     }
 }
