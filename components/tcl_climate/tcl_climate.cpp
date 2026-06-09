@@ -96,7 +96,7 @@ void TCLClimate::set_target_temperature(float target_temperature) {
 }
 
 void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
-    memcpy(outgoing_tx_command.raw, set_cmd_base, sizeof(outgoing_tx_command.raw));
+    memcpy(outgoing_tx_command.raw, outgoing_tx_cmd_template, sizeof(outgoing_tx_command.raw));
 
     // Manual assignment instead of struct initialization
     outgoing_tx_command.data.power = desired_ac_status->data.power;
