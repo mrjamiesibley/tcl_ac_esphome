@@ -14,6 +14,8 @@ static constexpr uint8_t REQ_CMD[] = {0xBB, 0x00, 0x01, 0x04, 0x02, 0x01, 0x00, 
 static constexpr int MAX_LINE_LENGTH = 100;
 static constexpr int UPDATE_INTERVAL_MS = 450;
 
+bool skip_next_update = false;
+
 void TCLClimate::set_current_temperature(float current_temperature) {
   if (std::abs(this->current_temperature - current_temperature) < 0.1f) return;
 
@@ -319,7 +321,7 @@ void TCLClimate::control(const climate::ClimateCall &call) {
     }
 
     if (should_build_cmd) {
-        ESP_LOGI("TCL", "Building and sending command to AC unit");
+        ESP_LOGI("TCL", "Building command to AC unit");
 
         build_set_cmd(&get_cmd_resp);
         ready_to_send_set_cmd_flag = true;
@@ -354,7 +356,16 @@ void TCLClimate::update() {
     if (ready_to_send_set_cmd_flag) {
         ready_to_send_set_cmd_flag = false;
         write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw));
+        ESP_LOGI("TCL", "Sending command to AC unit");
+      skip_next_update = true;
     } else {
+
+        if( skip_next_update)
+        {
+          skip_next_update = false;
+          ESP_LOGI("TCL", "Skipping 1 status update request.");
+          return;
+        }
         write_array(REQ_CMD, sizeof(REQ_CMD));
     }
 }
