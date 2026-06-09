@@ -194,8 +194,9 @@ void TCLClimate::control_vertical_swing(const std::string &swing_mode) {
   if (get_cmd_resp.data.vswing_mv) get_cmd_resp.data.vswing = 0x01;
   else get_cmd_resp.data.vswing = 0;
 
-  build_set_cmd(&get_cmd_resp);
-  ready_to_send_set_cmd_flag = true;
+  write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw)); //send command immediately
+  write_array(REQ_CMD, sizeof(REQ_CMD)); // send status request right after command
+  //ready_to_send_set_cmd_flag = true;
 }
 
 void TCLClimate::control_horizontal_swing(const std::string &swing_mode) {
@@ -220,7 +221,9 @@ void TCLClimate::control_horizontal_swing(const std::string &swing_mode) {
   else get_cmd_resp.data.hswing = 0;
 
   build_set_cmd(&get_cmd_resp);
-  ready_to_send_set_cmd_flag = true;
+  write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw)); //send command immediately
+  write_array(REQ_CMD, sizeof(REQ_CMD)); // send status request right after command
+  //ready_to_send_set_cmd_flag = true;
 }
 
 void TCLClimate::control(const climate::ClimateCall &call) {
@@ -320,8 +323,9 @@ void TCLClimate::control(const climate::ClimateCall &call) {
     if (should_build_cmd) {
         ESP_LOGI("TCL", "Building and sending command to AC unit");
 
-        build_set_cmd(&get_cmd_resp);
-        ready_to_send_set_cmd_flag = true;
+      write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw)); //send command immediately
+      write_array(REQ_CMD, sizeof(REQ_CMD)); // send status request right after command
+      //ready_to_send_set_cmd_flag = true;
     }
 }
 
@@ -350,12 +354,12 @@ climate::ClimateTraits TCLClimate::traits() {
 }
 
 void TCLClimate::update() {
-    if (ready_to_send_set_cmd_flag) {
-        ready_to_send_set_cmd_flag = false;
-        write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw));
-    } else {
+   // if (ready_to_send_set_cmd_flag) {
+      //  ready_to_send_set_cmd_flag = false;
+      //  write_array(m_set_cmd.raw, sizeof(m_set_cmd.raw));
+    //} else {
         write_array(REQ_CMD, sizeof(REQ_CMD));
-    }
+   // }
 }
 
 int TCLClimate::read_data_line(int readch, uint8_t *buffer, int len) {
