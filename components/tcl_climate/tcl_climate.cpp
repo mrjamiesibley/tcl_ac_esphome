@@ -325,6 +325,8 @@ void TCLClimate::control(const climate::ClimateCall &call) {
 
         build_set_cmd(&get_cmd_resp);
         ready_to_send_set_cmd_flag = true;
+
+       memcpy(m_get_cmd_resp.raw, get_cmd_resp.raw, sizeof(m_get_cmd_resp.raw)); // copy draft array back into recieve_tx_array
     }
 }
 
