@@ -320,12 +320,10 @@ void TCLClimate::control(const climate::ClimateCall &call) {
         ESP_LOGI("TCL", "Building command to AC unit");
 
         build_set_cmd(&desired_ac_status);
-        //ready_to_send_set_cmd_flag = true;
+        ready_to_send_set_cmd_flag = true;
        
        memcpy(last_ac_status.raw, desired_ac_status.raw, sizeof(last_ac_status.raw)); // copy draft array back into recieve_tx_array
 
-       write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
-      ESP_LOGI("TCL", "Sending command to AC unit");
     }
 }
 
