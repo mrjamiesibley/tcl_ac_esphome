@@ -450,12 +450,12 @@ void TCLClimate::loop() {
                 ESP_LOGD("TCL", "Temp [17][18]=%.2f°C  [16][17]=%.2f°C", curr_temp, alt_temp);
 
                 // Reject readings that change faster than 1°C per update (noise suppression)
-                static float last_temp = NAN;
-                if (!std::isnan(last_temp) && std::abs(curr_temp - last_temp) > 1.0f) {
-                    curr_temp = last_temp; // hold last valid reading
-                } else {
-                    last_temp = curr_temp;
-                }
+                //static float last_temp = NAN;
+                //if (!std::isnan(last_temp) && std::abs(curr_temp - last_temp) > 1.0f) {
+                   // curr_temp = last_temp; // hold last valid reading
+                //} else {
+                   // last_temp = curr_temp;
+               // }
                 this->is_changed = false;
 
                 // Set mode
