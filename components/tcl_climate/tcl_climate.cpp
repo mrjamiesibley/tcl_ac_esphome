@@ -359,7 +359,7 @@ void TCLClimate::update() {
         ready_to_send_set_cmd_flag = false;
         write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
         ESP_LOGI("TCL", "Sending command to AC unit");
-      //skip_next_update = true; // disabled for testing
+        skip_next_update = true;  // the AC takes a while to respond to our command, and the first status report back usualy contains the old AC state
     } else {
 
         if( skip_next_update)
