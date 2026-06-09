@@ -14,7 +14,7 @@ static constexpr uint8_t REQ_CMD[] = {0xBB, 0x00, 0x01, 0x04, 0x02, 0x01, 0x00, 
 static constexpr int MAX_LINE_LENGTH = 100;
 static constexpr int UPDATE_INTERVAL_MS = 450;
 
-//bool skip_next_update = false;
+bool skip_next_update = false;
 
 void TCLClimate::set_current_temperature(float current_temperature) {
   if (std::abs(this->current_temperature - current_temperature) < 0.01f) return; //no change
@@ -356,17 +356,17 @@ climate::ClimateTraits TCLClimate::traits() {
 void TCLClimate::update() {
     if (ready_to_send_set_cmd_flag) {
         ready_to_send_set_cmd_flag = false;
-        //write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
-        //ESP_LOGI("TCL", "Sending command to AC unit");
-        //skip_next_update = true;  // the AC takes a while to respond to our command, and the first status report back usualy contains the old AC state
+        write_array(outgoing_tx_command.raw, sizeof(outgoing_tx_command.raw));
+        ESP_LOGI("TCL", "Sending command to AC unit");
+        skip_next_update = true;  // the AC takes a while to respond to our command, and the first status report back usualy contains the old AC state
     } else {
 
-       // if( skip_next_update)
-       // {
-         // skip_next_update = false;
-          //ESP_LOGI("TCL", "Skipping 1 status update request.");
-         // return;
-       // }
+        if( skip_next_update)
+        {
+          skip_next_update = false;
+          ESP_LOGI("TCL", "Skipping 1 status update request.");
+          return;
+        }
         write_array(REQ_CMD, sizeof(REQ_CMD));
     }
 }
@@ -436,18 +436,18 @@ void TCLClimate::loop() {
                      return; // do not process a status report line if we have an outgoing command waiting
                   }
 
-                //  if( skip_next_update) 
-                //  {
-                   //  ESP_LOGD("TCL", "Skipping status report processing due to a recent command.");
-                    // return; // do not process a status report line if we have an outgoing command waiting
-                 // }
+                  if( skip_next_update) 
+                  {
+                     ESP_LOGD("TCL", "Skipping status report processing due to a recent command.");
+                     return; // do not process a status report line if we have an outgoing command waiting
+                  }
 
                 // Current temperature - rate-limited to reject noise
                 // Also logs alternative byte position [16][17] for comparison
                 float curr_temp = (((uint16_t)buffer[17] << 8 | (uint16_t)buffer[18]) / 374.0f - 32.0f) / 1.8f;
                 float alt_temp  = (((uint16_t)buffer[16] << 8 | (uint16_t)buffer[17]) / 374.0f - 32.0f) / 1.8f;
                 
-                this->is_changed = false;
+               // this->is_changed = false;
 
                 // Set mode
                 if (last_ac_status.data.power == 0x00) {
