@@ -17,31 +17,28 @@ static constexpr int UPDATE_INTERVAL_MS = 450;
 bool skip_next_update = false;
 
 void TCLClimate::set_current_temperature(float current_temperature) {
-  if (std::abs(this->current_temperature - current_temperature) < 0.1f) return;
-
-  // Log current temperature change
-  ESP_LOGD("TCL", "Current temperature updated to: %.1f°C", current_temperature);
-
+  if (std::abs(this->current_temperature - current_temperature) < 0.01f) return; //no change
   this->is_changed = true;
   this->current_temperature = current_temperature;
+
+  ESP_LOGD("TCL", "Current temperature reading updated to: %.1f°C", current_temperature); // Log current temperature change
 }
 
 void TCLClimate::set_custom_fan_mode(StringRef fan_mode) {
   StringRef current(this->get_custom_fan_mode());
-  if (!current.empty() && fan_mode == current.c_str()) {
-    return;
-  }
-
-  // Log the fan mode change
-  ESP_LOGI("TCL", "Fan mode changed to: %s", fan_mode.c_str());
+  if (!current.empty() && fan_mode == current.c_str())  return;  //no change
   this->is_changed = true;
-
   this->set_custom_fan_mode_(fan_mode.c_str());
+  
+  ESP_LOGI("TCL", "Fan mode changed to: %s", fan_mode.c_str());   // Log the fan mode change
 }
 
 void TCLClimate::set_mode(climate::ClimateMode mode) {
   if (this->mode == mode) return;
-  // Log the mode change
+  this->is_changed = true;
+  this->mode = mode;
+
+  // Log the HVAC mode change
   const char* mode_str = "";
   switch (mode) {
     case climate::CLIMATE_MODE_OFF: mode_str = "OFF"; break;
@@ -52,13 +49,14 @@ void TCLClimate::set_mode(climate::ClimateMode mode) {
     case climate::CLIMATE_MODE_AUTO: mode_str = "AUTO"; break;
     default: mode_str = "UNKNOWN"; break;
   }
-  ESP_LOGI("TCL", "Climate mode changed to: %s", mode_str);
-  this->is_changed = true;
-  this->mode = mode;
+  ESP_LOGI("TCL", "HVAC mode changed to: %s", mode_str);
+  
 }
 
 void TCLClimate::set_swing_mode(climate::ClimateSwingMode swing_mode) {
   if (this->swing_mode == swing_mode) return;
+  this->is_changed = true;
+  this->swing_mode = swing_mode;
 
   const char* swing_str = "";
   switch (swing_mode) {
@@ -69,39 +67,37 @@ void TCLClimate::set_swing_mode(climate::ClimateSwingMode swing_mode) {
     default: swing_str = "UNKNOWN"; break;
   }
   ESP_LOGI("TCL", "Swing mode changed to: %s", swing_str);
-  this->is_changed = true;
-  this->swing_mode = swing_mode;
+  
 }
 
 void TCLClimate::set_hswing_pos(const std::string &hswing_pos) {
   if (this->hswing_pos == hswing_pos) return;
-  ESP_LOGI("TCL", "Horizontal swing position: %s", hswing_pos.c_str());
   this->hswing_pos = hswing_pos;
+
+  ESP_LOGI("TCL", "Horizontal swing position: %s", hswing_pos.c_str());  
 }
 
 void TCLClimate::set_vswing_pos(const std::string &vswing_pos) {
   if (this->vswing_pos == vswing_pos) return;
-
-  ESP_LOGI("TCL", "Vertical swing position: %s", vswing_pos.c_str());
   this->vswing_pos = vswing_pos;
+  
+  ESP_LOGI("TCL", "Vertical swing position: %s", vswing_pos.c_str());
 }
 
 void TCLClimate::set_target_temperature(float target_temperature) {
-  if (std::abs(this->target_temperature - target_temperature) < 0.1f) return;
-  // Log temperature change
-  ESP_LOGI("TCL", "Target temperature changed to: %.1f°C", target_temperature);
-
+  if (std::abs(this->target_temperature - target_temperature) < 0.01f) return; // no change
   this->is_changed = true;
   this->target_temperature = target_temperature;
+
+  ESP_LOGI("TCL", "Target temperature changed to: %.1f°C", target_temperature);  // Log temperature change
 }
 
 void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
     memcpy(outgoing_tx_command.raw, outgoing_tx_cmd_template, sizeof(outgoing_tx_command.raw));
 
-    // Manual assignment instead of struct initialization
     outgoing_tx_command.data.power = desired_ac_status->data.power;
-    outgoing_tx_command.data.off_timer_en = 0;
-    outgoing_tx_command.data.on_timer_en = 0;
+    outgoing_tx_command.data.off_timer_en = 0; // not implemented
+    outgoing_tx_command.data.on_timer_en = 0;  // not implemented
     outgoing_tx_command.data.beep = beep_on ? 1 : 0;
     outgoing_tx_command.data.disp = display_on ? 1 : 0;
     outgoing_tx_command.data.eco = desired_ac_status->data.eco;
@@ -160,7 +156,7 @@ void TCLClimate::build_set_cmd(desired_ac_status_t *desired_ac_status) {
       outgoing_tx_command.data.hswing_mv = 0;
     }
 
-    outgoing_tx_command.data.half_degree = 0;
+    outgoing_tx_command.data.half_degree = 0;  // not implemented
 
     // Calculate XOR checksum
     uint8_t xor_byte = 0;
@@ -447,15 +443,7 @@ void TCLClimate::loop() {
                 // Also logs alternative byte position [16][17] for comparison
                 float curr_temp = (((uint16_t)buffer[17] << 8 | (uint16_t)buffer[18]) / 374.0f - 32.0f) / 1.8f;
                 float alt_temp  = (((uint16_t)buffer[16] << 8 | (uint16_t)buffer[17]) / 374.0f - 32.0f) / 1.8f;
-                ESP_LOGD("TCL", "Temp [17][18]=%.2f°C  [16][17]=%.2f°C", curr_temp, alt_temp);
-
-                // Reject readings that change faster than 1°C per update (noise suppression)
-                //static float last_temp = NAN;
-                //if (!std::isnan(last_temp) && std::abs(curr_temp - last_temp) > 1.0f) {
-                   // curr_temp = last_temp; // hold last valid reading
-                //} else {
-                   // last_temp = curr_temp;
-               // }
+                
                 this->is_changed = false;
 
                 // Set mode
@@ -503,6 +491,7 @@ void TCLClimate::loop() {
                   }
                 }
 
+
                 // Set swing mode - extracted from old code
                 if (last_ac_status.data.hswing && last_ac_status.data.vswing) {
                     this->set_swing_mode(climate::CLIMATE_SWING_BOTH);
@@ -538,8 +527,6 @@ void TCLClimate::loop() {
 
                 this->set_target_temperature(static_cast<float>(last_ac_status.data.temp + 16));
 
-               ESP_LOGD("TCL", "Target Temp =%.2f°C ", static_cast<float>(last_ac_status.data.temp + 16));
-              
                 this->set_current_temperature(curr_temp);
 
                 // Eco readback - direct preset assignment, must track change manually
@@ -553,6 +540,16 @@ void TCLClimate::loop() {
                 if (this->is_changed) {
                     this->publish_state();
                 }
+
+                ESP_LOGD("TCL", "RX HVAC Power $i ", last_ac_status.data.power);
+                ESP_LOGD("TCL", "RX HVAC Mode $i ", last_ac_status.data.mode);
+                ESP_LOGD("TCL", "RX Fan Mode $i ", last_ac_status.data.fan);
+                ESP_LOGD("TCL", "RX Temp [17][18]=%.2f°C  [16][17]=%.2f°C", curr_temp, alt_temp);
+                ESP_LOGD("TCL", "RX Target Temp =%.2f°C ", static_cast<float>(last_ac_status.data.temp + 16));
+                ESP_LOGD("TCL", "RX Disp Mode $i ", last_ac_status.data.disp);
+                ESP_LOGD("TCL", "RX Turbo Mode $i ", last_ac_status.data.turbo);
+                ESP_LOGD("TCL", "RX Mute Mode $i ", last_ac_status.data.mute);
+              
             }
         }
     }
