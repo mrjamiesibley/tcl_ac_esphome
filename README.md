@@ -6,6 +6,7 @@
 - Indoor unit temperature
 - Target temperature
 - Swing mode (only h/v, and visualization only)
+- ** Added support for Beep and LED Display toggling
 
 ### Tested on:
 - Royal Clima rci-pf40hn
