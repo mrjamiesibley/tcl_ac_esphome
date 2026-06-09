@@ -37,6 +37,8 @@ climate:
     id: tcl_custom_climate
     uart_id: uart_bus
     name: "HAVC TCL"
+    beep: false          
+    display: false      
 
 select:
   - platform: template
