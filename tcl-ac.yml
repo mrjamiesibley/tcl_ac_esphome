@@ -7,7 +7,7 @@ esp8266:
 external_components:
   - source:
       type: git
-      url: https://github.com/lNikazzzl/tcl_ac_esphome
+      url: https://github.com/mrjamiesibley/tcl_ac_esphome/
     components: [tcl_climate]
 #  or local
 #  - source: components
@@ -26,7 +26,7 @@ uart:
   tx_pin: 1
   rx_pin: 3
   baud_rate: 9600
-  parity: EVEN
+  parity: EVEN #IMPORTANT
 
 logger:
   level: VERBOSE
