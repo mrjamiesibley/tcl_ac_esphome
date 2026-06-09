@@ -541,14 +541,14 @@ void TCLClimate::loop() {
                     this->publish_state();
                 }
 
-                ESP_LOGD("TCL", "RX HVAC Power $i ", last_ac_status.data.power);
-                ESP_LOGD("TCL", "RX HVAC Mode $i ", last_ac_status.data.mode);
-                ESP_LOGD("TCL", "RX Fan Mode $i ", last_ac_status.data.fan);
+                ESP_LOGD("TCL", "RX HVAC Power %i ", last_ac_status.data.power);
+                ESP_LOGD("TCL", "RX HVAC Mode %i ", last_ac_status.data.mode);
+                ESP_LOGD("TCL", "RX Fan Mode %i ", last_ac_status.data.fan);
                 ESP_LOGD("TCL", "RX Temp [17][18]=%.2f°C  [16][17]=%.2f°C", curr_temp, alt_temp);
                 ESP_LOGD("TCL", "RX Target Temp =%.2f°C ", static_cast<float>(last_ac_status.data.temp + 16));
-                ESP_LOGD("TCL", "RX Disp Mode $i ", last_ac_status.data.disp);
-                ESP_LOGD("TCL", "RX Turbo Mode $i ", last_ac_status.data.turbo);
-                ESP_LOGD("TCL", "RX Mute Mode $i ", last_ac_status.data.mute);
+                ESP_LOGD("TCL", "RX Disp Mode %i ", last_ac_status.data.disp);
+                ESP_LOGD("TCL", "RX Turbo Mode %i ", last_ac_status.data.turbo);
+                ESP_LOGD("TCL", "RX Mute Mode %i ", last_ac_status.data.mute);
               
             }
         }
