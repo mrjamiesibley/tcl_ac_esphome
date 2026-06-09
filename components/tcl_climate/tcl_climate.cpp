@@ -179,7 +179,7 @@ void TCLClimate::setup() {
 void TCLClimate::control_vertical_swing(const std::string &swing_mode) {
 
   get_cmd_resp_t get_cmd_resp = {0};
-  memcpy(get_cmd_resp.raw, m_get_cmd_resp.raw, sizeof(get_cmd_resp.raw));
+  memcpy(get_cmd_resp.raw, last_ac_status.raw, sizeof(get_cmd_resp.raw));
 
   get_cmd_resp.data.vswing_mv = 0;
   get_cmd_resp.data.vswing_fix = 0;
@@ -203,7 +203,7 @@ void TCLClimate::control_vertical_swing(const std::string &swing_mode) {
 void TCLClimate::control_horizontal_swing(const std::string &swing_mode) {
 
   get_cmd_resp_t get_cmd_resp = {0};
-  memcpy(get_cmd_resp.raw, m_get_cmd_resp.raw, sizeof(get_cmd_resp.raw));
+  memcpy(get_cmd_resp.raw, last_ac_status.raw, sizeof(get_cmd_resp.raw));
 
   get_cmd_resp.data.hswing_mv = 0;
   get_cmd_resp.data.hswing_fix = 0;
@@ -228,7 +228,7 @@ void TCLClimate::control_horizontal_swing(const std::string &swing_mode) {
 
 void TCLClimate::control(const climate::ClimateCall &call) {
     get_cmd_resp_t get_cmd_resp = {0};
-    memcpy(get_cmd_resp.raw, m_get_cmd_resp.raw, sizeof(get_cmd_resp.raw));
+    memcpy(get_cmd_resp.raw, last_ac_status.raw, sizeof(get_cmd_resp.raw));
     bool should_build_cmd = false;
 
     if (call.get_preset().has_value()) {
@@ -326,7 +326,7 @@ void TCLClimate::control(const climate::ClimateCall &call) {
         build_set_cmd(&get_cmd_resp);
         ready_to_send_set_cmd_flag = true;
 
-       memcpy(m_get_cmd_resp.raw, get_cmd_resp.raw, sizeof(m_get_cmd_resp.raw)); // copy draft array back into recieve_tx_array
+       memcpy(last_ac_status.raw, get_cmd_resp.raw, sizeof(last_ac_status.raw)); // copy draft array back into recieve_tx_array
     }
 }
 
@@ -425,8 +425,8 @@ void TCLClimate::loop() {
     while (available()) {
         int len = read_data_line(read(), buffer, MAX_LINE_LENGTH);
 
-        if (len == sizeof(m_get_cmd_resp) && buffer[3] == 0x04) {
-            memcpy(m_get_cmd_resp.raw, buffer, len);
+        if (len == sizeof(last_ac_status) && buffer[3] == 0x04) {
+            memcpy(last_ac_status.raw, buffer, len);
 
             if (is_valid_xor(buffer, len)) {
                 print_hex_str(buffer, len);
@@ -459,7 +459,7 @@ void TCLClimate::loop() {
                 this->is_changed = false;
 
                 // Set mode
-                if (m_get_cmd_resp.data.power == 0x00) {
+                if (last_ac_status.data.power == 0x00) {
                     this->set_mode(climate::CLIMATE_MODE_OFF);
                 } else {
                     static const std::map<uint8_t, climate::ClimateMode> MODE_MAP = {
@@ -469,7 +469,7 @@ void TCLClimate::loop() {
                         {0x04, climate::CLIMATE_MODE_HEAT},
                         {0x05, climate::CLIMATE_MODE_AUTO}
                     };
-                    auto it = MODE_MAP.find(m_get_cmd_resp.data.mode);
+                    auto it = MODE_MAP.find(last_ac_status.data.mode);
                     if (it != MODE_MAP.end()) {
                         this->set_mode(it->second);
                     }
@@ -487,13 +487,13 @@ void TCLClimate::loop() {
 
                 StringRef current_fan(StringRef(this->get_custom_fan_mode()));
 
-                if (m_get_cmd_resp.data.turbo) {
+                if (last_ac_status.data.turbo) {
                   // String literal to StringRef - use explicit construction
                   this->set_custom_fan_mode(StringRef("Turbo"));
-                } else if (m_get_cmd_resp.data.mute) {
+                } else if (last_ac_status.data.mute) {
                   this->set_custom_fan_mode(StringRef("Mute"));
                 } else {
-                  auto it = FAN_MODE_MAP.find(m_get_cmd_resp.data.fan);
+                  auto it = FAN_MODE_MAP.find(last_ac_status.data.fan);
                   if (it != FAN_MODE_MAP.end()) {
                     StringRef current_fan(StringRef(this->get_custom_fan_mode()));
                     if (current_fan.empty() || current_fan != it->second) {
@@ -504,46 +504,46 @@ void TCLClimate::loop() {
                 }
 
                 // Set swing mode - extracted from old code
-                if (m_get_cmd_resp.data.hswing && m_get_cmd_resp.data.vswing) {
+                if (last_ac_status.data.hswing && last_ac_status.data.vswing) {
                     this->set_swing_mode(climate::CLIMATE_SWING_BOTH);
-                } else if (!m_get_cmd_resp.data.hswing && !m_get_cmd_resp.data.vswing) {
+                } else if (!last_ac_status.data.hswing && !last_ac_status.data.vswing) {
                     this->set_swing_mode(climate::CLIMATE_SWING_OFF);
-                } else if (m_get_cmd_resp.data.vswing) {
+                } else if (last_ac_status.data.vswing) {
                     this->set_swing_mode(climate::CLIMATE_SWING_VERTICAL);
-                } else if (m_get_cmd_resp.data.hswing) {
+                } else if (last_ac_status.data.hswing) {
                     this->set_swing_mode(climate::CLIMATE_SWING_HORIZONTAL);
                 }
 
                 // Set swing positions - extracted from old code
-                if (m_get_cmd_resp.data.vswing_mv == 0x01) set_vswing_pos("Move full");
-                else if (m_get_cmd_resp.data.vswing_mv == 0x02) set_vswing_pos("Move upper");
-                else if (m_get_cmd_resp.data.vswing_mv == 0x03) set_vswing_pos("Move lower");
-                else if (m_get_cmd_resp.data.vswing_fix == 0x01) set_vswing_pos("Fix top");
-                else if (m_get_cmd_resp.data.vswing_fix == 0x02) set_vswing_pos("Fix upper");
-                else if (m_get_cmd_resp.data.vswing_fix == 0x03) set_vswing_pos("Fix mid");
-                else if (m_get_cmd_resp.data.vswing_fix == 0x04) set_vswing_pos("Fix lower");
-                else if (m_get_cmd_resp.data.vswing_fix == 0x05) set_vswing_pos("Fix bottom");
+                if (last_ac_status.data.vswing_mv == 0x01) set_vswing_pos("Move full");
+                else if (last_ac_status.data.vswing_mv == 0x02) set_vswing_pos("Move upper");
+                else if (last_ac_status.data.vswing_mv == 0x03) set_vswing_pos("Move lower");
+                else if (last_ac_status.data.vswing_fix == 0x01) set_vswing_pos("Fix top");
+                else if (last_ac_status.data.vswing_fix == 0x02) set_vswing_pos("Fix upper");
+                else if (last_ac_status.data.vswing_fix == 0x03) set_vswing_pos("Fix mid");
+                else if (last_ac_status.data.vswing_fix == 0x04) set_vswing_pos("Fix lower");
+                else if (last_ac_status.data.vswing_fix == 0x05) set_vswing_pos("Fix bottom");
                 else set_vswing_pos("Last position");
 
-                if (m_get_cmd_resp.data.hswing_mv == 0x01) set_hswing_pos("Move full");
-                else if (m_get_cmd_resp.data.hswing_mv == 0x02) set_hswing_pos("Move left");
-                else if (m_get_cmd_resp.data.hswing_mv == 0x03) set_hswing_pos("Move mid");
-                else if (m_get_cmd_resp.data.hswing_mv == 0x04) set_hswing_pos("Move right");
-                else if (m_get_cmd_resp.data.hswing_fix == 0x01) set_hswing_pos("Fix left");
-                else if (m_get_cmd_resp.data.hswing_fix == 0x02) set_hswing_pos("Fix mid left");
-                else if (m_get_cmd_resp.data.hswing_fix == 0x03) set_hswing_pos("Fix mid");
-                else if (m_get_cmd_resp.data.hswing_fix == 0x04) set_hswing_pos("Fix mid right");
-                else if (m_get_cmd_resp.data.hswing_fix == 0x05) set_hswing_pos("Fix right");
+                if (last_ac_status.data.hswing_mv == 0x01) set_hswing_pos("Move full");
+                else if (last_ac_status.data.hswing_mv == 0x02) set_hswing_pos("Move left");
+                else if (last_ac_status.data.hswing_mv == 0x03) set_hswing_pos("Move mid");
+                else if (last_ac_status.data.hswing_mv == 0x04) set_hswing_pos("Move right");
+                else if (last_ac_status.data.hswing_fix == 0x01) set_hswing_pos("Fix left");
+                else if (last_ac_status.data.hswing_fix == 0x02) set_hswing_pos("Fix mid left");
+                else if (last_ac_status.data.hswing_fix == 0x03) set_hswing_pos("Fix mid");
+                else if (last_ac_status.data.hswing_fix == 0x04) set_hswing_pos("Fix mid right");
+                else if (last_ac_status.data.hswing_fix == 0x05) set_hswing_pos("Fix right");
                 else set_hswing_pos("Last position");
 
-                this->set_target_temperature(static_cast<float>(m_get_cmd_resp.data.temp + 16));
+                this->set_target_temperature(static_cast<float>(last_ac_status.data.temp + 16));
 
-               ESP_LOGD("TCL", "Target Temp =%.2f°C ", static_cast<float>(m_get_cmd_resp.data.temp + 16));
+               ESP_LOGD("TCL", "Target Temp =%.2f°C ", static_cast<float>(last_ac_status.data.temp + 16));
               
                 this->set_current_temperature(curr_temp);
 
                 // Eco readback - direct preset assignment, must track change manually
-                climate::ClimatePreset new_preset = m_get_cmd_resp.data.eco ?
+                climate::ClimatePreset new_preset = last_ac_status.data.eco ?
                     climate::CLIMATE_PRESET_ECO : climate::CLIMATE_PRESET_NONE;
                 if (this->preset != new_preset) {
                     this->preset = new_preset;
