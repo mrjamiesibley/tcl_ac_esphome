@@ -535,6 +535,9 @@ void TCLClimate::loop() {
                 else set_hswing_pos("Last position");
 
                 this->set_target_temperature(static_cast<float>(m_get_cmd_resp.data.temp + 16));
+
+               ESP_LOGD("TCL", "Target Temp =%.2f°C ", static_cast<float>(m_get_cmd_resp.data.temp + 16));
+              
                 this->set_current_temperature(curr_temp);
 
                 // Eco readback - direct preset assignment, must track change manually
